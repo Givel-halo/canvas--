@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      #canvas {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      #canvas canvas {
+        display: block;
+      }
+
+      #showImg {
+        width: 80%;
+        height: 80%;
+        position: absolute;
+        border: 1px solid #dedede;
+        left: 10%;
+        top: 10%;
+        display: none;
+      }
+
+      #clearCanvas,
+      #saveCanvas,
+      #revokeCanvas,
+      #norevokeCanvas {
+        position: absolute;
+        bottom: 0;
+        z-index: 1;
+        width: 20%;
+        height: 40px;
+        border: 1px solid #dedede;
+        line-height: 40px;
+        text-align: center;
+      }
+
+      #clearCanvas {
+        left: 0;
+      }
+
+      #revokeCanvas {
+        left: 28%;
+      }
+
+      #norevokeCanvas {
+        left: 53%;
+      }
+      #saveCanvas {
+        right: 0;
+      }
+
+      .errorCanvas {
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transform: translateY(40%);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="canvas">
+      <p id="clearCanvas">❌</p>
+      <p id="saveCanvas">✔️</p>
+      <p id="revokeCanvas">↩️</p>
+      <p id="norevokeCanvas">↪️</p>
+      <div >
+        <img id="showImg" onclick="isShow()" src="" alt="" />
+      </div>
+    </div>
+  </body>
+  <script>
+    window.onload = function () {
+
+      new lineCanvas({
+        el: document.querySelector("#canvas"),
+        clearEl: document.querySelector("#clearCanvas"),
+        saveEl: document.querySelector("#saveCanvas"),
+        revokeEl: document.querySelector("#revokeCanvas"),
+        norevokeEl: document.querySelector("#norevokeCanvas"),
+        // lineWidth: 1, // 线条粗细
+        // color: 'black', // 线条颜色
+        // background: '#fff'
+      });
+    };
+    function isShow(){
+      let imgDom = document.querySelector("#showImg");
+      imgDom.style.display = 'none'
+    }
+
+    function lineCanvas(obj) {
+      this.lineWidth = 5;
+      this.color = "#000";
+      this.background = "#fff";
+      let canvasHistory = [];
+      let step = -1;
+      for (var i in obj) {
+        this[i] = obj[i];
+      }
+
+      this.canvas = document.createElement("canvas");
+      if (!(this.canvas.getContext && this.canvas.getContext("2d"))) {
+        this.section = document.createElement("section");
+        this.section.className = "errorCanvas";
+        this.section.innerHTML = "对不起，当前浏览器暂不支持此功能！";
+        this.el.prepend(this.section);
+        return;
+      }
+      this.canvas.width = this.el.clientWidth;
+      this.canvas.height = this.el.clientHeight;
+      this.el.prepend(this.canvas);
+
+      this.cxt = this.canvas.getContext("2d");
+      this.cxt.fillStyle = this.background;
+      this.cxt.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.cxt.strokeStyle = this.color;
+      this.cxt.lineWidth = this.lineWidth;
+      this.cxt.lineCap = "round"; // 线条末端添加圆形线帽，减少线条的生硬感
+      this.cxt.lineJoin = "round"; // 线条交汇时为原型边角
+      // 利用阴影，消除锯齿
+      this.cxt.shadowBlur = 1;
+      this.cxt.shadowColor = "#000";
+
+      // 开始绘制
+      this.canvas.addEventListener(
+        "touchstart",
+        function (e) {
+          this.cxt.beginPath();
+          this.cxt.moveTo(e.changedTouches[0].pageX, e.changedTouches[0].pageY);
+        }.bind(this),
+        false
+      );
+
+      // 绘制中
+      this.canvas.addEventListener(
+        "touchmove",
+        function (e) {
+          this.cxt.lineTo(e.changedTouches[0].pageX, e.changedTouches[0].pageY);
+          this.cxt.stroke();
+        }.bind(this),
+        false
+      );
+
+      // 结束绘制
+      this.canvas.addEventListener(
+        "touchend",
+        function (e) {
+          this.cxt.closePath();
+          step++;
+          if (step < canvasHistory.length) {
+            canvasHistory.length = step; // 截断数组
+          }
+          canvasHistory.push(this.canvas.toDataURL()); // 添加新的绘制到历史记录
+        }.bind(this),
+        false
+      );
+
+      // 撤销
+      this.revokeEl.addEventListener(
+        "click",
+        function () {
+          if (step >= 0) {
+            step--;
+            this.cxt.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            let canvasPic = new Image();
+            canvasPic.src = canvasHistory[step];
+            canvasPic.addEventListener("load", () => {
+              this.cxt.drawImage(canvasPic, 0, 0);
+            });
+          } else {
+            alert("不能再继续撤销了");
+          }
+        }.bind(this),
+        false
+      );
+
+      // 反撤销
+      this.norevokeEl.addEventListener(
+        "click",
+        function () {
+          if (step < canvasHistory.length - 1) {
+            step++;
+            let canvasPic = new Image();
+            canvasPic.src = canvasHistory[step];
+            canvasPic.addEventListener("load", () => {
+              this.cxt.clearRect(0, 0, this.canvas.width, this.canvas.height);
+              this.cxt.drawImage(canvasPic, 0, 0);
+            });
+          } else {
+            alert("已经是最新的记录了");
+          }
+        }.bind(this),
+        false
+      );
+
+      // 清除画布
+      this.clearEl.addEventListener(
+        "click",
+        function () {
+          this.cxt.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }.bind(this),
+        false
+      );
+
+      // 保存图片
+      this.saveEl.addEventListener(
+        "click",
+        function () {
+          var imgBase64 = this.canvas.toDataURL();
+          var imgPng = this.canvas.toDataURL("image/png");
+          var imgJpg = this.canvas.toDataURL("image/jpeg", 0.8);
+          console.log(imgPng, imgJpg);
+          let imgDom = document.querySelector("#showImg");
+          imgDom.src = imgJpg;
+          imgDom.style.display = "block";
+        }.bind(this),
+        false
+      );
+    }
+  </script>
+</html>
